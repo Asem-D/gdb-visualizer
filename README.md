@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/sem-daaboul/gdb-visualizer)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/Asem-D/gdb-visualizer)
 
 ---
 
