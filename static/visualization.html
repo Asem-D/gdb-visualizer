@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GDB Schema Viewer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 52px;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    display: flex; align-items: center; padding: 0 20px; gap: 16px;
+  }
+  #header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
+  #schema-name { color: #6366f1; }
+  .header-spacer { flex: 1; }
+  .stat-badge {
+    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+    padding: 4px 10px; font-size: 12px; white-space: nowrap;
+  }
+  .stat-badge strong { color: #6366f1; }
+
+  /* ── Sub-header / Filters ───────────────────────────────── */
+  #sub-header {
+    position: fixed; top: 52px; left: 0; right: 340px; z-index: 99;
+    height: 40px;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    display: flex; align-items: center; padding: 0 16px; gap: 6px;
+    overflow-x: auto;
+  }
+  #sub-header::-webkit-scrollbar { height: 0; }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    border: 1px solid transparent; transition: all .2s;
+    user-select: none; white-space: nowrap; flex-shrink: 0;
+  }
+  .filter-chip .swatch {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .filter-chip .count {
+    background: rgba(255,255,255,.12); border-radius: 8px;
+    padding: 0 5px; font-size: 10px;
+  }
+  .filter-chip.active { border-color: rgba(255,255,255,.2); }
+  .filter-chip.inactive { opacity: .35; }
+
+  /* ── SVG Canvas ─────────────────────────────────────────── */
+  #canvas-wrap {
+    position: fixed; top: 92px; left: 0; right: 340px; bottom: 0;
+  }
+  #canvas-wrap svg { width: 100%; height: 100%; }
+
+  /* ── Right Panel ────────────────────────────────────────── */
+  #detail-panel {
+    position: fixed; top: 20px; right: 0; bottom: 0; width: 340px; z-index: 90;
+    background: #1e293b; border-left: 1px solid #334155;
+    overflow-y: auto; padding: 16px;
+    transition: transform .25s ease;
+  }
+  #detail-panel.collapsed { transform: translateX(340px); }
+  #detail-panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  #detail-panel .type-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    margin-bottom: 12px; letter-spacing: .4px;
+  }
+  .detail-section { margin-bottom: 14px; }
+  .detail-section h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+    color: #94a3b8; margin-bottom: 6px; font-weight: 600;
+  }
+  .detail-table {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  .detail-table th {
+    text-align: left; padding: 4px 8px; background: #0f172a;
+    color: #94a3b8; font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .4px;
+    border-bottom: 1px solid #334155;
+  }
+  .detail-table td {
+    padding: 4px 8px; border-bottom: 1px solid #1e293b;
+    word-break: break-word;
+  }
+  .detail-table tr:nth-child(even) td { background: rgba(15,23,42,.4); }
+  .field-type-badge {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    font-size: 10px; font-weight: 600; background: #334155;
+  }
+  .cv-key { font-family: monospace; color: #6366f1; }
+  .conn-list { list-style: none; }
+  .conn-list li {
+    padding: 3px 0; font-size: 12px;
+    border-bottom: 1px solid rgba(51,65,85,.4);
+  }
+  .conn-list .conn-type { font-size: 10px; color: #94a3b8; }
+  .null-yes { color: #10b981; }
+  .null-no { color: #64748b; }
+
+  /* ── Legend ──────────────────────────────────────────────── */
+  #legend {
+    position: fixed; bottom: 16px; left: 16px; z-index: 80;
+    background: rgba(30,41,59,.92); border: 1px solid #334155;
+    border-radius: 8px; padding: 12px 14px; font-size: 11px;
+    backdrop-filter: blur(6px); max-height: 50vh; overflow-y: auto;
+  }
+  #legend h4 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+    color: #94a3b8; margin-bottom: 6px;
+  }
+  .legend-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .legend-swatch {
+    width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+  }
+  .legend-line {
+    width: 20px; height: 0; flex-shrink: 0;
+  }
+  .legend-line.solid { border-top: 2px solid; }
+  .legend-line.dashed {
+    border-top: 2px dashed;
+  }
+  .legend-divider { height: 1px; background: #334155; margin: 8px 0; }
+
+  /* ── Reset Button ───────────────────────────────────────── */
+  #reset-btn {
+    position: fixed; bottom: 16px; right: 356px; z-index: 80;
+    background: #334155; border: 1px solid #475569; border-radius: 6px;
+    color: #e2e8f0; padding: 6px 14px; font-size: 12px; cursor: pointer;
+    transition: background .15s;
+  }
+  #reset-btn:hover { background: #475569; }
+
+  /* ── Tooltip ────────────────────────────────────────────── */
+  #tooltip {
+    position: fixed; z-index: 200; pointer-events: none;
+    background: rgba(15,23,42,.95); border: 1px solid #475569;
+    border-radius: 6px; padding: 8px 12px; font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    opacity: 0; transition: opacity .15s;
+    max-width: 280px; line-height: 1.4;
+  }
+  #tooltip .tt-name { font-weight: 600; margin-bottom: 2px; }
+  #tooltip .tt-type { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+  #tooltip .tt-prop { color: #cbd5e1; margin-top: 3px; }
+
+  /* ── Empty state ────────────────────────────────────────── */
+  #empty-detail {
+    color: #64748b; font-size: 13px; text-align: center; margin-top: 80px;
+  }
+
+  /* ── Format tabs ─────────────────────────────────────────── */
+  #format-tabs {
+    display: flex; align-items: center; gap: 2px;
+    background: #0f172a; border-radius: 6px; padding: 2px;
+  }
+  .fmt-tab {
+    padding: 4px 12px; border-radius: 4px; border: none;
+    background: transparent; color: #94a3b8; font-size: 11px;
+    font-weight: 500; cursor: pointer; transition: all .15s;
+    font-family: inherit;
+  }
+  .fmt-tab:hover { color: #e2e8f0; background: rgba(99,102,241,.15); }
+  .fmt-tab.active { background: #6366f1; color: #fff; }
+
+  /* ── Format content views ────────────────────────────────── */
+  .format-view {
+    position: fixed; top: 52px; left: 0; right: 0; bottom: 0;
+    overflow: auto; background: #0f172a; z-index: 50;
+  }
+  .format-content {
+    padding: 24px; max-width: 1200px; margin: 0 auto;
+  }
+  .format-content h2 {
+    font-size: 14px; color: #6366f1; margin-bottom: 16px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+  }
+
+  /* ── Mermaid ──────────────────────────────────────────────── */
+  #mermaid-container .mermaid {
+    background: #1e293b; border-radius: 8px; padding: 24px;
+    border: 1px solid #334155;
+  }
+  #mermaid-source {
+    display: none; margin-top: 16px;
+  }
+  #mermaid-source pre {
+    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+    padding: 16px; overflow-x: auto; font-size: 12px;
+    color: #94a3b8; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    white-space: pre;
+  }
+
+  /* ── Table view ───────────────────────────────────────────── */
+  .schema-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  .schema-table th {
+    background: #1e293b; color: #6366f1; padding: 8px 12px;
+    text-align: left; font-weight: 600; border-bottom: 2px solid #334155;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .schema-table td {
+    padding: 6px 12px; border-bottom: 1px solid #1e293b;
+  }
+  .schema-table tr:nth-child(even) td { background: rgba(30,41,59,.4); }
+  .schema-table tr:hover td { background: rgba(99,102,241,.08); }
+  .schema-table .tbl-type { color: #94a3b8; font-size: 11px; }
+  .schema-table .tbl-alias { color: #64748b; font-style: italic; }
+  .schema-table .tbl-kind {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 500; text-transform: uppercase;
+  }
+  .tbl-kind-table { background: rgba(99,102,241,.15); color: #818cf8; }
+  .tbl-kind-view { background: rgba(16,185,129,.15); color: #34d399; }
+  .tbl-kind-feature { background: rgba(245,158,11,.15); color: #fbbf24; }
+  .tbl-kind-relationship { background: rgba(239,68,68,.15); color: #f87171; }
+  .edge-table { margin-top: 32px; }
+  .edge-table th { background: #1a1f2e; }
+
+  /* ── JSON view ────────────────────────────────────────────── */
+  #json-container pre {
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    padding: 20px; overflow: auto; font-size: 12px; line-height: 1.5;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    color: #e2e8f0; white-space: pre; max-height: calc(100vh - 160px);
+  }
+  .json-key { color: #7dd3fc; }
+  .json-string { color: #86efac; }
+  .json-number { color: #fbbf24; }
+  .json-bool { color: #c084fc; }
+  .json-null { color: #64748b; }
+
+  /* ── Export bar ───────────────────────────────────────────── */
+  .export-bar {
+    display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;
+  }
+  .export-bar button {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid #334155;
+    background: #1e293b; color: #94a3b8; font-size: 12px;
+    cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .export-bar button:hover {
+    background: #334155; color: #e2e8f0; border-color: #6366f1;
+  }
+  .export-bar button.copied {
+    background: rgba(16,185,129,.15); color: #34d399; border-color: #10b981;
+  }
+
+  /* ── Source toggle ────────────────────────────────────────── */
+  .source-toggle {
+    padding: 4px 10px; border-radius: 4px; border: 1px solid #334155;
+    background: transparent; color: #64748b; font-size: 11px;
+    cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .source-toggle:hover { color: #94a3b8; border-color: #475569; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <h1>⬡ GDB Schema Viewer</h1>
+  <span style="color:#475569">│</span>
+  <h1 id="schema-name">Loading…</h1>
+  <div class="header-spacer"></div>
+  <div id="format-tabs">
+    <button class="fmt-tab active" data-format="d3">⬡ D3 Graph</button>
+    <button class="fmt-tab" data-format="mermaid">◇ Mermaid</button>
+    <button class="fmt-tab" data-format="table">☰ Table</button>
+    <button class="fmt-tab" data-format="json">{ } JSON</button>
+  </div>
+  <div class="stat-badge" id="stat-nodes"><strong>0</strong> nodes</div>
+  <div class="stat-badge" id="stat-edges"><strong>0</strong> edges</div>
+</div>
+
+<!-- Filter chips -->
+<div id="sub-header"></div>
+
+<!-- Format: Mermaid -->
+<div id="format-mermaid" class="format-view" style="display:none;">
+  <div class="format-content" id="mermaid-container">
+    <h2>◇ Mermaid ER Diagram</h2>
+    <div class="mermaid" id="mermaid-diagram"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;">
+      <button class="source-toggle" id="mermaid-source-toggle" onclick="toggleMermaidSource()">Show Source</button>
+    </div>
+    <div id="mermaid-source"><pre id="mermaid-code"></pre></div>
+    <div class="export-bar">
+      <button onclick="copyMermaid()">📋 Copy Mermaid Source</button>
+      <button onclick="downloadMermaid()">⬇ Download .mmd</button>
+    </div>
+  </div>
+</div>
+
+<!-- Format: Table -->
+<div id="format-table" class="format-view" style="display:none;">
+  <div class="format-content" id="table-container"></div>
+</div>
+
+<!-- Format: JSON -->
+<div id="format-json" class="format-view" style="display:none;">
+  <div class="format-content" id="json-container"></div>
+</div>
+
+<!-- SVG canvas -->
+<div id="canvas-wrap">
+  <svg id="graph"></svg>
+</div>
+
+<!-- Right panel -->
+<div id="detail-panel" class="collapsed">
+  <div id="empty-detail">Select a node to view details</div>
+  <div id="detail-content" style="display:none;"></div>
+</div>
+
+<!-- Legend -->
+<div id="legend"></div>
+
+<!-- Reset button -->
+<button id="reset-btn" title="Reset zoom and pan">⟲ Reset View</button>
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div class="tt-name"></div>
+  <div class="tt-type"></div>
+  <div class="tt-prop"></div>
+</div>
+
+<script src="js/d3.v7.min.js"></script>
+<script src="js/mermaid.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ============================================================
+     Colour maps
+     ============================================================ */
+  const NODE_COLORS = {
+    feature_dataset:    "#6366f1",
+    feature_class:      "#10b981",
+    table:              "#8b5cf6",
+    domain:             "#06b6d4",
+    topology:           "#ef4444",
+    network:            "#f59e0b",
+    relationship_class: "#ec4899",
+    attribute_rule:     "#f97316"
+  };
+  const EDGE_COLORS = {
+    contains:     "#475569",
+    relationship: "#ec4899",
+    uses_domain:  "#06b6d4",
+    topology_rule:"#ef4444",
+    controller:   "#f59e0b",
+    has_field:    "#334155",
+    has_subtypes: "#14b8a6"
+  };
+  const NODE_RADIUS = { feature_dataset: 30, feature_class: 18, table: 16, domain: 12, topology: 16, network: 16, relationship_class: 14, attribute_rule: 14 };
+  const NODE_RADIUS_DEFAULT = 16;
+  const LINK_DISTANCE = { contains: 120, relationship: 200, uses_domain: 180, topology_rule: 160, controller: 160, has_field: 80, has_subtypes: 140 };
+  const LINK_DISTANCE_DEFAULT = 140;
+
+  /* ============================================================
+     Load schema data
+     ============================================================ */
+  let SCHEMA = window.SCHEMA_DATA || null;
+
+  async function loadSchema() {
+    if (SCHEMA) return SCHEMA;
+    try {
+      const resp = await fetch('schema.json');
+      if (!resp.ok) throw new Error(resp.statusText);
+      SCHEMA = await resp.json();
+      return SCHEMA;
+    } catch (e) {
+      console.error('Failed to load schema.json:', e);
+      return null;
+    }
+  }
+
+  /* ============================================================
+     Helpers
+     ============================================================ */
+  function nodeRadius(d) { return NODE_RADIUS[d.node_type] || NODE_RADIUS_DEFAULT; }
+  function nodeColor(d)  { return NODE_COLORS[d.node_type] || "#64748b"; }
+  function edgeColor(e)  { return EDGE_COLORS[e.edge_type] || "#475569"; }
+  function edgeDistance(e){ return LINK_DISTANCE[e.edge_type] || LINK_DISTANCE_DEFAULT; }
+  function isRounded(d)  { return d.node_type === "feature_dataset" || d.node_type === "table"; }
+
+  /* ============================================================
+     Build legend
+     ============================================================ */
+  function buildLegend() {
+    let html = '<h4>Node Types</h4>';
+    for (const [type, color] of Object.entries(NODE_COLORS)) {
+      const r = NODE_RADIUS[type] || NODE_RADIUS_DEFAULT;
+      if (isRounded({node_type: type})) {
+        html += `<div class="legend-row"><div class="legend-swatch" style="background:${color};border-radius:3px;"></div><span>${type.replace(/_/g,' ')}</span></div>`;
+      } else {
+        html += `<div class="legend-row"><div class="legend-swatch" style="background:${color};border-radius:50%;"></div><span>${type.replace(/_/g,' ')}</span></div>`;
+      }
+    }
+    html += '<div class="legend-divider"></div><h4>Edge Types</h4>';
+    for (const [type, color] of Object.entries(EDGE_COLORS)) {
+      const dashed = type !== "contains" && type !== "has_field";
+      html += `<div class="legend-row"><div class="legend-line ${dashed?'dashed':'solid'}" style="border-color:${color};"></div><span>${type.replace(/_/g,' ')}</span></div>`;
+    }
+    document.getElementById('legend').innerHTML = html;
+  }
+
+  /* ============================================================
+     Build filter chips
+     ============================================================ */
+  function buildFilters(nodes) {
+    const counts = {};
+    nodes.forEach(n => { counts[n.node_type] = (counts[n.node_type]||0)+1; });
+    const wrap = document.getElementById('sub-header');
+    wrap.innerHTML = '';
+    const activeTypes = new Set(Object.keys(counts));
+    for (const [type, count] of Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]))) {
+      const chip = document.createElement('div');
+      chip.className = 'filter-chip active';
+      chip.dataset.type = type;
+      chip.innerHTML = `<div class="swatch" style="background:${NODE_COLORS[type]||'#64748b'}"></div>${type.replace(/_/g,' ')}<span class="count">${count}</span>`;
+      chip.addEventListener('click', () => toggleFilter(chip, type));
+      wrap.appendChild(chip);
+    }
+    return activeTypes;
+  }
+
+  let activeFilters = new Set();
+
+  function toggleFilter(chip, type) {
+    if (chip.classList.contains('active')) {
+      chip.classList.remove('active');
+      chip.classList.add('inactive');
+      activeFilters.delete(type);
+    } else {
+      chip.classList.remove('inactive');
+      chip.classList.add('active');
+      activeFilters.add(type);
+    }
+    applyFilters();
+  }
+
+  function applyFilters() {
+    if (activeFilters.size === 0) { activeFilters = new Set(Object.keys(NODE_COLORS)); }
+
+    // Determine which node IDs are visible
+    const visNodes = new Set();
+    SCHEMA.nodes.forEach(n => { if (activeFilters.has(n.node_type)) visNodes.add(n.id); });
+
+    // Nodes
+    d3.selectAll('.node-group').transition().duration(300)
+      .style('opacity', d => visNodes.has(d.id) ? 1 : 0.06);
+    d3.selectAll('.node-label').transition().duration(300)
+      .style('opacity', d => visNodes.has(d.id) ? 1 : 0.06);
+
+    // Edges
+    d3.selectAll('.link-group').transition().duration(300)
+      .style('opacity', d => (visNodes.has(d.source.id || d.source) && visNodes.has(d.target.id || d.target)) ? 1 : 0.04);
+    d3.selectAll('.link-label').transition().duration(300)
+      .style('opacity', d => (visNodes.has(d.source.id || d.source) && visNodes.has(d.target.id || d.target)) ? 0.7 : 0);
+  }
+
+  /* ============================================================
+     Detail panel
+     ============================================================ */
+  function showDetail(d) {
+    const panel = document.getElementById('detail-panel');
+    const empty = document.getElementById('empty-detail');
+    const content = document.getElementById('detail-content');
+    panel.classList.remove('collapsed');
+    empty.style.display = 'none';
+    content.style.display = 'block';
+
+    let html = `<h2>${d.name}</h2>`;
+    const col = NODE_COLORS[d.node_type] || '#64748b';
+    html += `<span class="type-badge" style="background:${col}22;color:${col};border:1px solid ${col}44;">${d.node_type.replace(/_/g,' ')}</span>`;
+
+    // Properties
+    const props = d.properties || {};
+    const propsEntries = Object.entries(props).filter(([k]) => !['fields','subtypes','coded_values'].includes(k));
+    if (propsEntries.length > 0) {
+      html += '<div class="detail-section"><h3>Properties</h3><table class="detail-table"><tr><th>Key</th><th>Value</th></tr>';
+      propsEntries.forEach(([k,v]) => {
+        html += `<tr><td style="color:#94a3b8;font-family:monospace;font-size:11px;">${k}</td><td>${typeof v === 'object' ? JSON.stringify(v) : v}</td></tr>`;
+      });
+      html += '</table></div>';
+    }
+
+    // Fields
+    const fields = props.fields;
+    if (Array.isArray(fields) && fields.length > 0) {
+      html += '<div class="detail-section"><h3>Fields (' + fields.length + ')</h3><table class="detail-table"><tr><th>Name</th><th>Type</th><th>Alias</th><th>Domain</th><th>Nullable</th></tr>';
+      fields.forEach(f => {
+        const ft = f.field_type || '—';
+        html += `<tr><td style="font-family:monospace;font-size:11px;">${f.name}</td>`;
+        html += `<td><span class="field-type-badge">${ft}</span></td>`;
+        html += `<td>${f.alias || '—'}</td>`;
+        html += `<td>${f.domain || '—'}</td>`;
+        html += `<td class="${f.nullable === false ? 'null-no' : 'null-yes'}">${f.nullable === false ? 'No' : 'Yes'}</td>`;
+        html += '</tr>';
+      });
+      html += '</table></div>';
+    }
+
+    // Coded values
+    const cv = props.coded_values;
+    if (cv && typeof cv === 'object') {
+      const entries = Object.entries(cv);
+      if (entries.length > 0) {
+        html += '<div class="detail-section"><h3>Coded Values (' + entries.length + ')</h3><table class="detail-table"><tr><th>Code</th><th>Description</th></tr>';
+        entries.forEach(([k, v]) => {
+          html += `<tr><td class="cv-key">${k}</td><td>${v}</td></tr>`;
+        });
+        html += '</table></div>';
+      }
+    }
+
+    // Subtypes
+    const subtypes = props.subtypes;
+    if (Array.isArray(subtypes) && subtypes.length > 0) {
+      html += '<div class="detail-section"><h3>Subtypes (' + subtypes.length + ')</h3><table class="detail-table"><tr><th>Code</th><th>Name</th></tr>';
+      subtypes.forEach(s => {
+        html += `<tr><td class="cv-key">${s.code}</td><td>${s.name}</td></tr>`;
+      });
+      html += '</table></div>';
+    }
+
+    // Connected nodes
+    const connEdges = SCHEMA.edges.filter(e => (e.source === d.id || e.source.id === d.id) || (e.target === d.id || e.target.id === d.id));
+    if (connEdges.length > 0) {
+      html += '<div class="detail-section"><h3>Connected Nodes</h3><ul class="conn-list">';
+      connEdges.forEach(e => {
+        const srcId = e.source.id || e.source;
+        const tgtId = e.target.id || e.target;
+        const otherId = srcId === d.id ? tgtId : srcId;
+        const otherNode = SCHEMA.nodes.find(n => n.id === otherId);
+        const otherName = otherNode ? otherNode.name : otherId;
+        const arrow = srcId === d.id ? ' → ' : ' ← ';
+        html += `<li><span class="conn-type">${e.edge_type.replace(/_/g,' ')}</span>${arrow}<strong>${otherName}</strong></li>`;
+      });
+      html += '</ul></div>';
+    }
+
+    content.innerHTML = html;
+  }
+
+  function hideDetail() {
+    document.getElementById('detail-panel').classList.add('collapsed');
+    document.getElementById('empty-detail').style.display = '';
+    document.getElementById('detail-content').style.display = 'none';
+  }
+
+  /* ============================================================
+     Main render
+     ============================================================ */
+  async function init() {
+    const schema = await loadSchema();
+    if (!schema) {
+      document.getElementById('schema-name').textContent = 'No schema loaded';
+      return;
+    }
+
+    // Title & stats
+    document.getElementById('schema-name').textContent = schema.name || 'Untitled';
+    document.getElementById('stat-nodes').innerHTML = `<strong>${schema.nodes.length}</strong> nodes`;
+    document.getElementById('stat-edges').innerHTML = `<strong>${schema.edges.length}</strong> edges`;
+
+    // Init filter state
+    activeFilters = buildFilters(schema.nodes);
+    buildLegend();
+
+    // SVG setup
+    const wrap = document.getElementById('canvas-wrap');
+    const width = wrap.clientWidth;
+    const height = wrap.clientHeight;
+
+    const svg = d3.select('#graph');
+    svg.selectAll('*').remove();
+    svg.attr('width', width).attr('height', height);
+
+    // Defs for arrow markers
+    const defs = svg.append('defs');
+    for (const [type, color] of Object.entries(EDGE_COLORS)) {
+      defs.append('marker')
+        .attr('id', `arrow-${type}`)
+        .attr('viewBox', '0 0 10 6')
+        .attr('refX', 10).attr('refY', 3)
+        .attr('markerWidth', 8).attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,0 L10,3 L0,6 Z')
+        .attr('fill', color);
+    }
+
+    // Zoom layer
+    const container = svg.append('g').attr('class', 'zoom-container');
+
+    const zoom = d3.zoom()
+      .scaleExtent([0.1, 6])
+      .on('zoom', (event) => {
+        container.attr('transform', event.transform);
+      });
+    svg.call(zoom);
+
+    // Reset view
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+    });
+
+    // Tooltip reference
+    const tooltip = document.getElementById('tooltip');
+
+    // Clone nodes for D3
+    const nodes = schema.nodes.map(n => Object.assign({}, n));
+    const nodeMap = {};
+    nodes.forEach(n => { nodeMap[n.id] = n; });
+
+    const edges = schema.edges.map(e => ({
+      source: e.source,
+      target: e.target,
+      edge_type: e.edge_type,
+      label: e.label
+    })).filter(e => nodeMap[e.source] && nodeMap[e.target]);
+
+    // ── Force simulation ──
+    const simulation = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(edges).id(d => d.id).distance(d => edgeDistance(d)))
+      .force('charge', d3.forceManyBody().strength(-300))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collide', d3.forceCollide().radius(d => nodeRadius(d) + 14).strength(0.8))
+      .force('x', d3.forceX(width / 2).strength(0.05))
+      .force('y', d3.forceY(height / 2).strength(0.05))
+      .alphaDecay(0.028)
+      .velocityDecay(0.4);
+
+    // ── Draw edges ──
+    const linkGroup = container.append('g').attr('class', 'links');
+    const linkSel = linkGroup.selectAll('.link-group')
+      .data(edges)
+      .enter().append('g')
+      .attr('class', 'link-group');
+
+    const linkLine = linkSel.append('line')
+      .attr('stroke', d => edgeColor(d))
+      .attr('stroke-width', d => d.edge_type === 'has_field' ? 1 : 2)
+      .attr('stroke-dasharray', d => {
+        if (d.edge_type === 'contains' || d.edge_type === 'has_field') return null;
+        return '6,4';
+      })
+      .attr('marker-end', d => {
+        if (d.edge_type === 'has_field' || d.edge_type === 'has_subtypes') return null;
+        return `url(#arrow-${d.edge_type})`;
+      });
+
+    // Edge labels (only for relationship-type edges)
+    const linkLabelSel = linkSel.filter(d => d.label && d.edge_type !== 'contains')
+      .append('text')
+      .attr('class', 'link-label')
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 10)
+      .attr('fill', d => edgeColor(d))
+      .attr('opacity', 0.7)
+      .attr('dy', -4)
+      .text(d => d.label);
+
+    // ── Draw nodes ──
+    const nodeGroup = container.append('g').attr('class', 'nodes');
+    const nodeSel = nodeGroup.selectAll('.node-group')
+      .data(nodes)
+      .enter().append('g')
+      .attr('class', 'node-group')
+      .call(d3.drag()
+        .on('start', dragStarted)
+        .on('drag', dragged)
+        .on('end', dragEnded));
+
+    // Node shapes
+    nodeSel.each(function (d) {
+      const g = d3.select(this);
+      const r = nodeRadius(d);
+      const col = nodeColor(d);
+
+      if (isRounded(d)) {
+        // Rounded rect
+        const rw = r * 2.2, rh = r * 1.5;
+        g.append('rect')
+          .attr('x', -rw / 2).attr('y', -rh / 2)
+          .attr('width', rw).attr('height', rh)
+          .attr('rx', 6).attr('ry', 6)
+          .attr('fill', col + '22')
+          .attr('stroke', col).attr('stroke-width', 2);
+        // Icon circle inside
+        g.append('circle')
+          .attr('r', r * 0.35)
+          .attr('fill', col).attr('opacity', 0.6);
+      } else {
+        g.append('circle')
+          .attr('r', r)
+          .attr('fill', col + '22')
+          .attr('stroke', col).attr('stroke-width', 2);
+      }
+    });
+
+    // Node labels
+    const labelSel = container.append('g').attr('class', 'labels');
+    const nodeLabelSel = labelSel.selectAll('.node-label')
+      .data(nodes)
+      .enter().append('text')
+      .attr('class', 'node-label')
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 11)
+      .attr('font-weight', 500)
+      .attr('fill', '#e2e8f0')
+      .attr('pointer-events', 'none')
+      .attr('dy', d => nodeRadius(d) + 16)
+      .text(d => d.name);
+
+    // ── Interactions ──
+    let selectedNode = null;
+
+    nodeSel
+      .on('mouseenter', function (event, d) {
+        if (d3.select(this).style('opacity') === '0.06') return;
+        tooltip.querySelector('.tt-name').textContent = d.name;
+        tooltip.querySelector('.tt-type').textContent = d.node_type.replace(/_/g, ' ');
+        let propText = '';
+        if (d.properties) {
+          const p = d.properties;
+          if (p.geometry_type) propText += `Geometry: ${p.geometry_type}\n`;
+          if (p.domain_type) propText += `Domain Type: ${p.domain_type}\n`;
+          if (p.field_type) propText += `Field Type: ${p.field_type}\n`;
+          if (p.spatial_reference) propText += `SR: ${p.spatial_reference}\n`;
+          if (p.field_count != null) propText += `Fields: ${p.field_count}\n`;
+        }
+        tooltip.querySelector('.tt-prop').textContent = propText.trim();
+        tooltip.style.opacity = 1;
+
+        // Highlight connected
+        if (!selectedNode) highlightConnected(d);
+      })
+      .on('mousemove', function (event) {
+        let tx = event.clientX + 14;
+        let ty = event.clientY - 10;
+        if (tx + 280 > window.innerWidth) tx = event.clientX - 290;
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top = ty + 'px';
+      })
+      .on('mouseleave', function () {
+        tooltip.style.opacity = 0;
+        if (!selectedNode) resetHighlight();
+      })
+      .on('click', function (event, d) {
+        event.stopPropagation();
+        if (selectedNode === d) {
+          selectedNode = null;
+          resetHighlight();
+          hideDetail();
+        } else {
+          selectedNode = d;
+          highlightConnected(d);
+          showDetail(d);
+        }
+      });
+
+    svg.on('click', function () {
+      if (selectedNode) {
+        selectedNode = null;
+        resetHighlight();
+        hideDetail();
+      }
+    });
+
+    function getConnectedIds(d) {
+      const ids = new Set([d.id]);
+      edges.forEach(e => {
+        const src = e.source.id || e.source;
+        const tgt = e.target.id || e.target;
+        if (src === d.id) ids.add(tgt);
+        if (tgt === d.id) ids.add(src);
+      });
+      return ids;
+    }
+
+    function highlightConnected(d) {
+      const connIds = getConnectedIds(d);
+      nodeSel.transition().duration(200)
+        .style('opacity', n => connIds.has(n.id) ? 1 : 0.1);
+      nodeLabelSel.transition().duration(200)
+        .style('opacity', n => connIds.has(n.id) ? 1 : 0.1);
+      linkSel.transition().duration(200)
+        .style('opacity', l => {
+          const sid = l.source.id || l.source;
+          const tid = l.target.id || l.target;
+          return (sid === d.id || tid === d.id) ? 1 : 0.05;
+        });
+      linkLabelSel.transition().duration(200)
+        .style('opacity', l => {
+          const sid = l.source.id || l.source;
+          const tid = l.target.id || l.target;
+          return (sid === d.id || tid === d.id) ? 1 : 0;
+        });
+      // Boost connected edges
+      linkLine.filter(l => (l.source.id || l.source) === d.id || (l.target.id || l.target) === d.id)
+        .transition().duration(200).attr('stroke-width', l => l.edge_type === 'has_field' ? 1.5 : 3);
+    }
+
+    function resetHighlight() {
+      // Respect filter state
+      applyFilters();
+      linkLine.transition().duration(200)
+        .attr('stroke-width', d => d.edge_type === 'has_field' ? 1 : 2);
+    }
+
+    // ── Tick ──
+    simulation.on('tick', () => {
+      linkSel.select('line')
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => {
+          const dx = d.target.x - d.source.x;
+          const dy = d.target.y - d.source.y;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          const r = nodeRadius(typeof d.target === 'object' ? d.target : nodes.find(n=>n.id===d.target) || {});
+          return d.target.x - (dx/dist) * r;
+        })
+        .attr('y2', d => {
+          const dx = d.target.x - d.source.x;
+          const dy = d.target.y - d.source.y;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          const r = nodeRadius(typeof d.target === 'object' ? d.target : nodes.find(n=>n.id===d.target) || {});
+          return d.target.y - (dy/dist) * r;
+        });
+
+      linkLabelSel
+        .attr('x', d => (d.source.x + d.target.x) / 2)
+        .attr('y', d => (d.source.y + d.target.y) / 2);
+
+      nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+      nodeLabelSel
+        .attr('x', d => d.x)
+        .attr('y', d => d.y);
+    });
+
+    // ── Drag ──
+    function dragStarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.15).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+    function dragEnded(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    // ── Resize handler ──
+    window.addEventListener('resize', () => {
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      svg.attr('width', w).attr('height', h);
+      simulation.force('center', d3.forceCenter(w / 2, h / 2));
+      simulation.force('x', d3.forceX(w / 2).strength(0.05));
+      simulation.force('y', d3.forceY(h / 2).strength(0.05));
+      simulation.alpha(0.3).restart();
+    });
+  }
+
+  init();
+
+  /* ══════════════════════════════════════════════════════════
+     FORMAT SWITCHING & RENDERING
+     ══════════════════════════════════════════════════════════ */
+
+  let currentFormat = 'd3';
+  let mermaidRendered = false;
+  let tableRendered = false;
+  let jsonRendered = false;
+
+  // Tab click handlers
+  document.querySelectorAll('.fmt-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchFormat(tab.dataset.format));
+  });
+
+  function switchFormat(fmt) {
+    if (fmt === currentFormat) return;
+    currentFormat = fmt;
+
+    // Update tab active state
+    document.querySelectorAll('.fmt-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.format === fmt);
+    });
+
+    // D3-specific elements
+    const d3Elements = ['sub-header', 'canvas-wrap', 'detail-panel', 'legend', 'reset-btn'];
+    d3Elements.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = fmt === 'd3' ? '' : 'none';
+    });
+
+    // Format views
+    document.querySelectorAll('.format-view').forEach(v => v.style.display = 'none');
+    if (fmt !== 'd3') {
+      document.getElementById('format-' + fmt).style.display = '';
+    }
+
+    // Lazy render on first switch (rendered flag only set on success)
+    if (fmt === 'mermaid' && !mermaidRendered) { if (renderMermaid()) mermaidRendered = true; }
+    if (fmt === 'table' && !tableRendered) { if (renderTable()) tableRendered = true; }
+    if (fmt === 'json' && !jsonRendered) { if (renderJson()) jsonRendered = true; }
+  }
+
+  /* -- Mermaid ER Diagram --------------------------------------- */
+
+  function renderMermaid() {
+    if (!SCHEMA || !SCHEMA.nodes || !SCHEMA.edges) return false;
+
+    const lines = ['erDiagram'];
+
+    // Map node IDs to clean names for Mermaid
+    const idToName = {};
+    SCHEMA.nodes.forEach(n => {
+      idToName[n.id] = n.name.replace(/[^A-Za-z0-9_]/g, '_');
+    });
+
+    // Generate entities with fields
+    SCHEMA.nodes.forEach(n => {
+      const name = idToName[n.id];
+      lines.push('');
+      lines.push('    ' + name + ' {');
+
+      // Add alias as comment if present
+      if (n.alias) {
+        lines.push('        string alias "' + n.alias + '"');
+      }
+
+      // Add fields
+      const fields = n.fields || {};
+      const fieldKeys = Object.keys(fields).sort();
+      fieldKeys.forEach(k => {
+        const f = fields[k];
+        const type = (f.type || 'string').replace(/\(.+\)/, '');
+        const safeName = k.replace(/[^A-Za-z0-9_]/g, '_');
+        lines.push('        ' + type + ' ' + safeName);
+      });
+
+      // Add domain if present
+      if (n.domain) {
+        lines.push('        string domain "' + n.domain + '"');
+      }
+
+      lines.push('    }');
+    });
+
+    // Generate relationships
+    SCHEMA.edges.forEach(e => {
+      const src = idToName[e.source];
+      const tgt = idToName[e.target];
+      const label = e.edge_type.replace(/_/g, ' ');
+      lines.push('    ' + src + ' }|--|| ' + tgt + ' : "' + label + '"');
+    });
+
+    const mermaidSource = lines.join('\n');
+
+    // Set source code
+    document.getElementById('mermaid-code').textContent = mermaidSource;
+
+    // Render
+    const diagramEl = document.getElementById('mermaid-diagram');
+    diagramEl.textContent = mermaidSource;
+    diagramEl.removeAttribute('data-processed');
+
+    try {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: {
+          primaryColor: '#1e293b',
+          primaryTextColor: '#e2e8f0',
+          primaryBorderColor: '#334155',
+          lineColor: '#475569',
+          secondaryColor: '#0f172a',
+          tertiaryColor: '#1e293b',
+          fontSize: '12px'
+        },
+        er: { useMaxWidth: false }
+      });
+      mermaid.run({ nodes: [diagramEl] });
+    } catch (err) {
+      diagramEl.innerHTML = '<pre style="color:#f87171;">Mermaid render error: ' + err.message + '</pre>';
+    }
+    return true;
+  }
+
+  function toggleMermaidSource() {
+    const src = document.getElementById('mermaid-source');
+    const btn = document.getElementById('mermaid-source-toggle');
+    const visible = src.style.display !== 'none';
+    src.style.display = visible ? 'none' : '';
+    btn.textContent = visible ? 'Show Source' : 'Hide Source';
+  }
+
+  function copyMermaid() {
+    const code = document.getElementById('mermaid-code').textContent;
+    navigator.clipboard.writeText(code).then(() => flashBtn(event.target, 'Copied!'));
+  }
+
+  function downloadMermaid() {
+    const code = document.getElementById('mermaid-code').textContent;
+    downloadFile(code, (SCHEMA.name || 'schema') + '.mmd', 'text/plain');
+  }
+
+  /* -- Markdown Table ------------------------------------------- */
+
+  function renderTable() {
+    if (!SCHEMA || !SCHEMA.nodes) return false;
+
+    const container = document.getElementById('table-container');
+    let html = '<h2>\u2630 Schema Tables</h2>';
+
+    // Node tables
+    html += '<table class="schema-table"><thead><tr>';
+    html += '<th>Table</th><th>Alias</th><th>Kind</th><th>Domain</th><th>Fields</th>';
+    html += '</tr></thead><tbody>';
+
+    const sortedNodes = [...SCHEMA.nodes].sort((a, b) => a.name.localeCompare(b.name));
+
+    sortedNodes.forEach(n => {
+      const fieldCount = n.fields ? Object.keys(n.fields).length : 0;
+      const kindClass = 'tbl-kind-' + (n.kind || 'table').toLowerCase().replace(/[^a-z]/g, '');
+      html += '<tr>';
+      html += '<td><strong>' + esc(n.name) + '</strong></td>';
+      html += '<td class="tbl-alias">' + esc(n.alias || '\u2014') + '</td>';
+      html += '<td><span class="tbl-kind ' + kindClass + '">' + esc(n.kind || 'table') + '</span></td>';
+      html += '<td class="tbl-type">' + esc(n.domain || '\u2014') + '</td>';
+      html += '<td>' + fieldCount + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+
+    // Field detail for each node
+    sortedNodes.forEach(n => {
+      const fields = n.fields || {};
+      const fieldKeys = Object.keys(fields);
+      if (fieldKeys.length === 0) return;
+
+      html += '<h3 style="color:#818cf8;margin-top:24px;font-size:13px;">' + esc(n.name) + ' fields</h3>';
+      html += '<table class="schema-table"><thead><tr>';
+      html += '<th>Field</th><th>Type</th><th>Nullable</th><th>Default</th>';
+      html += '</tr></thead><tbody>';
+
+      fieldKeys.sort().forEach(k => {
+        const f = fields[k];
+        html += '<tr>';
+        html += '<td>' + esc(k) + '</td>';
+        html += '<td class="tbl-type">' + esc(f.type || '\u2014') + '</td>';
+        html += '<td>' + (f.nullable === false ? 'NOT NULL' : 'yes') + '</td>';
+        html += '<td class="tbl-type">' + (f.default != null ? esc(String(f.default)) : '\u2014') + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+    });
+
+    // Edge table
+    if (SCHEMA.edges && SCHEMA.edges.length > 0) {
+      html += '<h2 style="margin-top:32px;">\u21C4 Relationships</h2>';
+      html += '<table class="schema-table edge-table"><thead><tr>';
+      html += '<th>Source</th><th>Target</th><th>Type</th>';
+      html += '</tr></thead><tbody>';
+
+      const nodeMap = {};
+      SCHEMA.nodes.forEach(n => nodeMap[n.id] = n.name);
+
+      [...SCHEMA.edges].sort((a, b) => {
+        const aName = nodeMap[a.source] || a.source;
+        const bName = nodeMap[b.source] || b.source;
+        return aName.localeCompare(bName);
+      }).forEach(e => {
+        html += '<tr>';
+        html += '<td><strong>' + esc(nodeMap[e.source] || e.source) + '</strong></td>';
+        html += '<td><strong>' + esc(nodeMap[e.target] || e.target) + '</strong></td>';
+        html += '<td class="tbl-type">' + esc(e.edge_type) + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+    }
+
+    // Export bar
+    html += '<div class="export-bar"><button onclick="downloadMarkdown()">\u2B07 Download .md</button></div>';
+
+    container.innerHTML = html;
+    return true;
+  }
+
+  function downloadMarkdown() {
+    if (!SCHEMA || !SCHEMA.nodes) return;
+
+    let md = '# ' + (SCHEMA.name || 'Schema') + '\n\n';
+    md += '**' + SCHEMA.nodes.length + '** nodes, **' + (SCHEMA.edges ? SCHEMA.edges.length : 0) + '** relationships\n\n';
+
+    // Tables
+    md += '## Tables\n\n';
+    md += '| Table | Alias | Kind | Domain | Fields |\n';
+    md += '|-------|-------|------|--------|--------|\n';
+
+    [...SCHEMA.nodes].sort((a, b) => a.name.localeCompare(b.name)).forEach(n => {
+      const fieldCount = n.fields ? Object.keys(n.fields).length : 0;
+      md += '| ' + n.name + ' | ' + (n.alias || '\u2014') + ' | ' + (n.kind || 'table') + ' | ' + (n.domain || '\u2014') + ' | ' + fieldCount + ' |\n';
+    });
+
+    // Field details
+    [...SCHEMA.nodes].sort((a, b) => a.name.localeCompare(b.name)).forEach(n => {
+      const fields = n.fields || {};
+      const fieldKeys = Object.keys(fields);
+      if (fieldKeys.length === 0) return;
+
+      md += '\n### ' + n.name + ' fields\n\n';
+      md += '| Field | Type | Nullable | Default |\n';
+      md += '|-------|------|----------|--------|\n';
+
+      fieldKeys.sort().forEach(k => {
+        const f = fields[k];
+        md += '| ' + k + ' | ' + (f.type || '\u2014') + ' | ' + (f.nullable === false ? 'NOT NULL' : 'yes') + ' | ' + (f.default != null ? f.default : '\u2014') + ' |\n';
+      });
+    });
+
+    // Relationships
+    if (SCHEMA.edges && SCHEMA.edges.length > 0) {
+      md += '\n## Relationships\n\n';
+      md += '| Source | Target | Type |\n';
+      md += '|--------|--------|------|\n';
+
+      const nodeMap = {};
+      SCHEMA.nodes.forEach(n => nodeMap[n.id] = n.name);
+
+      SCHEMA.edges.forEach(e => {
+        md += '| ' + (nodeMap[e.source] || e.source) + ' | ' + (nodeMap[e.target] || e.target) + ' | ' + e.edge_type + ' |\n';
+      });
+    }
+
+    downloadFile(md, (SCHEMA.name || 'schema') + '.md', 'text/markdown');
+  }
+
+  /* -- JSON View ----------------------------------------------- */
+
+  function renderJson() {
+    if (!SCHEMA) return false;
+
+    const container = document.getElementById('json-container');
+    const json = JSON.stringify(SCHEMA, null, 2);
+    const highlighted = syntaxHighlightJson(json);
+
+    container.innerHTML = '<h2>{ } Raw Schema JSON</h2>';
+    const pre = document.createElement('pre');
+    pre.innerHTML = highlighted;
+    container.appendChild(pre);
+
+    // Export bar
+    const bar = document.createElement('div');
+    bar.className = 'export-bar';
+    bar.innerHTML = '<button onclick="copyJson()">\uD83D\uDCCB Copy JSON</button> <button onclick="downloadJson()">\u2B07 Download .json</button>';
+    container.appendChild(bar);
+    return true;
+  }
+
+  function syntaxHighlightJson(json) {
+    return json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"([^"\\]*(\\.[^"\\]*)*)"\s*:/g, '<span class="json-key">"$1"</span>:')
+      .replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, '<span class="json-string">"$1"</span>')
+      .replace(/\b(-?\d+\.?\d*([eE][+-]?\d+)?)\b/g, '<span class="json-number">$1</span>')
+      .replace(/\b(true|false)\b/g, '<span class="json-bool">$1</span>')
+      .replace(/\bnull\b/g, '<span class="json-null">null</span>');
+  }
+
+  function copyJson() {
+    const json = JSON.stringify(SCHEMA, null, 2);
+    navigator.clipboard.writeText(json).then(() => flashBtn(event.target, 'Copied!'));
+  }
+
+  function downloadJson() {
+    const json = JSON.stringify(SCHEMA, null, 2);
+    downloadFile(json, (SCHEMA.name || 'schema') + '.json', 'application/json');
+  }
+
+  /* -- Export helpers ------------------------------------------- */
+
+  function flashBtn(btn, text) {
+    const orig = btn.textContent;
+    btn.textContent = text;
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+  }
+
+  function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function esc(s) {
+    const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+  }
+
+})();
+</script>
+</body>
+</html>
+  /* -- Large schema banner ---- */
+  #large-schema-banner {
+    display: none;
+    position: fixed; top: 52px; left: 0; right: 340px; z-index: 98;
+    padding: 12px 20px;
+    font-size: 13px; line-height: 1.5;
+    border-bottom: 1px solid;
+  }
+  #large-schema-banner.warn {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(245,158,11,.12);
+    border-color: rgba(245,158,11,.3);
+    color: #fbbf24;
+  }
+  #large-schema-banner.critical {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(239,68,68,.12);
+    border-color: rgba(239,68,68,.3);
+    color: #f87171;
+  }
+  #large-schema-banner .banner-icon { font-size: 20px; flex-shrink: 0; }
+  #large-schema-banner .banner-text { flex: 1; }
+  #large-schema-banner .banner-text strong { font-weight: 600; }
+  #large-schema-banner .banner-actions {
+    display: flex; gap: 8px; flex-shrink: 0;
+  }
+  #large-schema-banner .banner-actions button {
+    padding: 5px 12px; border-radius: 5px; border: 1px solid;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    font-family: inherit; transition: all .15s;
+  }
+  #large-schema-banner.warn .banner-actions button {
+    background: rgba(245,158,11,.15); color: #fbbf24;
+    border-color: rgba(245,158,11,.4);
+  }
+  #large-schema-banner.warn .banner-actions button:hover {
+    background: rgba(245,158,11,.25);
+  }
+  #large-schema-banner.critical .banner-actions button {
+    background: rgba(239,68,68,.15); color: #f87171;
+    border-color: rgba(239,68,68,.4);
+  }
+  #large-schema-banner.critical .banner-actions button:hover {
+    background: rgba(239,68,68,.25);
+  }
+  #large-schema-banner.critical .banner-actions button.primary {
+    background: rgba(99,102,241,.2); color: #818cf8;
+    border-color: rgba(99,102,241,.4);
+  }
+  #large-schema-banner.critical .banner-actions button.primary:hover {
+    background: rgba(99,102,241,.35);
+  }
+
+  /* -- Report mode ---- */
+  #report-mode {
+    display: none;
+    position: fixed; top: 52px; left: 0; right: 0; bottom: 0;
+    background: #0f172a; z-index: 50;
+    overflow: auto;
+  }
+  #report-mode.active { display: block; }
+  #report-mode .report-header {
+    padding: 16px 24px;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    display: flex; align-items: center; gap: 12px;
+  }
+  #report-mode .report-header h2 {
+    font-size: 14px; color: #6366f1; flex: 1;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+  }
+  #report-mode .report-frame {
+    width: 100%; height: calc(100vh - 120px);
+    border: none; background: #fff;
+  }
+  #report-mode .report-fallback {
+    padding: 48px 24px; text-align: center; color: #94a3b8;
+    font-size: 14px;
+  }
+  #report-mode .report-fallback a {
+    color: #818cf8; text-decoration: underline;
+  }
+
+  /* -- Source toggle ----
+
+<!-- Large schema banner -->
+<div id="large-schema-banner">
+  <span class="banner-icon"></span>
+  <div class="banner-text"></div>
+  <div class="banner-actions"></div>
+</div>
+
+<!-- Report mode (iframe embed) -->
+<div id="report-mode">
+  <div class="report-header">
+    <h2>Esri Schema Report</h2>
+    <div id="report-actions"></div>
+  </div>
+  <div id="report-body"></div>
+</div>
+
+<!-- Filter chips -->
+  init();
+
+  /* =================================================================
+     LARGE SCHEMA DETECTION & REPORT MODE
+     ================================================================= */
+
+  const LARGE_THRESHOLD = 150;
+  const HUGE_THRESHOLD = 400;
+  let reportAvailable = false;
+  let esriReportFile = null;
+
+  async function probeReportAssets() {
+    const candidates = [
+      'esri_schema_report.html',
+      'schema_report.html',
+      'SchemaReport.html'
+    ];
+    for (const name of candidates) {
+      try {
+        const resp = await fetch(name, { method: 'HEAD' });
+        if (resp.ok) { esriReportFile = name; reportAvailable = true; return; }
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  function checkSchemaSize(nodeCount) {
+    const banner = document.getElementById('large-schema-banner');
+    if (nodeCount < LARGE_THRESHOLD) { banner.style.display = 'none'; return; }
+
+    const icon = banner.querySelector('.banner-icon');
+    const text = banner.querySelector('.banner-text');
+    const actions = banner.querySelector('.banner-actions');
+    actions.innerHTML = '';
+
+    if (nodeCount >= HUGE_THRESHOLD) {
+      banner.className = 'critical';
+      icon.textContent = '\u26A0\uFE0F';
+      text.innerHTML = '<strong>Large Schema (' + nodeCount + ' nodes)</strong> \u2014 Interactive diagrams may be slow or cluttered.';
+
+      if (reportAvailable) {
+        actions.innerHTML =
+          '<button class="primary" onclick="showReportMode()">\uD83D\uDCCB View Full Report</button>' +
+          '<a href="' + esriReportFile + '" download style="text-decoration:none;"><button>\uD83D\uDCE5 Download HTML</button></a>';
+      } else {
+        text.innerHTML += ' Generate an Esri Schema Report for best results:<br><code style="font-size:11px;color:#94a3b8;">gdbviz extract -p &lt;gdb&gt; --schema-report</code>';
+      }
+    } else {
+      banner.className = 'warn';
+      icon.textContent = '\u26A0\uFE0F';
+      text.innerHTML = '<strong>Moderate Schema (' + nodeCount + ' nodes)</strong> \u2014 Diagrams may be cluttered.';
+      if (reportAvailable) {
+        actions.innerHTML =
+          '<button onclick="showReportMode()">\uD83D\uDCCB View Report</button>';
+      }
+    }
+
+    updateBannerRightEdge();
+  }
+
+  function updateBannerRightEdge() {
+    const banner = document.getElementById('large-schema-banner');
+    const panel = document.getElementById('detail-panel');
+    if (!banner || banner.style.display === 'none') return;
+    if (panel && !panel.classList.contains('collapsed')) {
+      banner.style.right = '340px';
+    } else {
+      banner.style.right = '0';
+    }
+  }
+
+  function showReportMode() {
+    document.getElementById('canvas-wrap').style.display = 'none';
+    document.getElementById('sub-header').style.display = 'none';
+    document.getElementById('detail-panel').style.display = 'none';
+    document.getElementById('legend').style.display = 'none';
+    document.getElementById('reset-btn').style.display = 'none';
+    document.querySelectorAll('.format-view').forEach(v => v.style.display = 'none');
+
+    const rm = document.getElementById('report-mode');
+    rm.classList.add('active');
+
+    const body = document.getElementById('report-body');
+    if (esriReportFile) {
+      body.innerHTML = '<iframe class="report-frame" src="' + esriReportFile + '" title="Esri Schema Report"></iframe>';
+    } else {
+      body.innerHTML = '<div class="report-fallback">No Esri Schema Report found.<br>Generate one with: <code>gdbviz extract -p &lt;gdb&gt; --schema-report</code></div>';
+    }
+
+    document.querySelectorAll('.fmt-tab').forEach(t => t.classList.remove('active'));
+  }
+
+  function hideReportMode() {
+    document.getElementById('report-mode').classList.remove('active');
+    document.getElementById('report-body').innerHTML = '';
+    switchFormat('d3');
+  }
+
+  probeReportAssets().then(() => {
+    if (SCHEMA && SCHEMA.nodes) checkSchemaSize(SCHEMA.nodes.length);
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     FORMAT SWITCHING & RENDERING
+     ══════════════════════════════════════════════════════════ */

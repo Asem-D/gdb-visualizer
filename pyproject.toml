@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gdb-visualizer"
+version = "0.1.0"
+description = "Interactive geodatabase schema visualization — extract, explore, and share your ArcGIS geodatabase structure"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Asem Daaboul", email = "asem.daaboul@gmail.com" },
+]
+keywords = [
+    "arcgis",
+    "geodatabase",
+    "gis",
+    "schema",
+    "visualization",
+    "mermaid",
+    "plantuml",
+    "graphviz",
+    "d3js",
+    "spatial-data",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+]
+ogr = [
+    "GDAL>=3.0",
+]
+
+[project.scripts]
+gdbviz = "gdbviz.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/sem-daaboul/gdb-visualizer"
+Documentation = "https://github.com/sem-daaboul/gdb-visualizer#readme"
+Repository = "https://github.com/sem-daaboul/gdb-visualizer"
+Issues = "https://github.com/sem-daaboul/gdb-visualizer/issues"
+
+[tool.setuptools.packages.find]
+include = ["gdbviz*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

@@ -1,0 +1,354 @@
+{
+  "name": "CityGIS_Sample",
+  "path": "C:\\Data\\CityGIS.gdb",
+  "metadata": {
+    "extractor": "demo",
+    "note": "Sample geodatabase schema for demonstration purposes"
+  },
+  "nodes": [
+    {
+      "id": "feature_dataset://Infrastructure",
+      "name": "Infrastructure",
+      "node_type": "feature_dataset",
+      "properties": {
+        "spatial_reference": "WGS_1984_UTM_Zone_37N"
+      }
+    },
+    {
+      "id": "feature_dataset://LandUse",
+      "name": "LandUse",
+      "node_type": "feature_dataset",
+      "properties": {
+        "spatial_reference": "WGS_1984_UTM_Zone_37N"
+      }
+    },
+    {
+      "id": "feature_dataset://Utilities",
+      "name": "Utilities",
+      "node_type": "feature_dataset",
+      "properties": {
+        "spatial_reference": "WGS_1984_UTM_Zone_37N"
+      }
+    },
+    {
+      "id": "feature_class://CityGIS.gdb\\Infrastructure\\Roads",
+      "name": "Roads",
+      "node_type": "feature_class",
+      "properties": {
+        "geometry_type": "Polyline",
+        "shape_field": "Shape",
+        "oid_field": "OBJECTID",
+        "feature_dataset": "Infrastructure",
+        "field_count": 8,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "alias": "", "is_oid": true, "is_nullable": false},
+          {"name": "Shape", "field_type": "Geometry", "alias": "", "is_shape": true, "is_nullable": true},
+          {"name": "RoadName", "field_type": "String", "alias": "Road Name", "length": 100, "is_nullable": true},
+          {"name": "RoadClass", "field_type": "SmallInteger", "alias": "Road Classification", "domain": "RoadClassDomain", "is_nullable": true},
+          {"name": "Width", "field_type": "Double", "alias": "Width (m)", "is_nullable": true},
+          {"name": "Surface", "field_type": "String", "alias": "Surface Type", "domain": "SurfaceTypeDomain", "length": 20, "is_nullable": true},
+          {"name": "LastUpdate", "field_type": "Date", "alias": "Last Updated", "is_nullable": true},
+          {"name": "Status", "field_type": "SmallInteger", "alias": "Status", "is_nullable": true}
+        ]
+      }
+    },
+    {
+      "id": "feature_class://CityGIS.gdb\\Infrastructure\\Bridges",
+      "name": "Bridges",
+      "node_type": "feature_class",
+      "properties": {
+        "geometry_type": "Point",
+        "shape_field": "Shape",
+        "oid_field": "OBJECTID",
+        "feature_dataset": "Infrastructure",
+        "field_count": 6,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "is_oid": true},
+          {"name": "Shape", "field_type": "Geometry", "is_shape": true},
+          {"name": "BridgeName", "field_type": "String", "length": 100},
+          {"name": "SpanLength", "field_type": "Double"},
+          {"name": "LoadRating", "field_type": "Double"},
+          {"name": "YearBuilt", "field_type": "Integer"}
+        ]
+      }
+    },
+    {
+      "id": "feature_class://CityGIS.gdb\\LandUse\\Parcels",
+      "name": "Parcels",
+      "node_type": "feature_class",
+      "properties": {
+        "geometry_type": "Polygon",
+        "shape_field": "Shape",
+        "oid_field": "OBJECTID",
+        "feature_dataset": "LandUse",
+        "field_count": 12,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "is_oid": true},
+          {"name": "Shape", "field_type": "Geometry", "is_shape": true},
+          {"name": "ParcelID", "field_type": "String", "length": 20},
+          {"name": "OwnerName", "field_type": "String", "length": 100},
+          {"name": "LandUse", "field_type": "SmallInteger", "domain": "LandUseDomain"},
+          {"name": "Area", "field_type": "Double"},
+          {"name": "Frontage", "field_type": "Double"},
+          {"name": "Zone", "field_type": "String", "length": 10},
+          {"name": "Subdivision", "field_type": "String", "length": 50},
+          {"name": "RegistrationDate", "field_type": "Date"},
+          {"name": "Value", "field_type": "Double"},
+          {"name": "Status", "field_type": "SmallInteger"}
+        ],
+        "subtypes": [
+          {"code": 0, "name": "Residential"},
+          {"code": 1, "name": "Commercial"},
+          {"code": 2, "name": "Industrial"},
+          {"code": 3, "name": "Agricultural"}
+        ]
+      }
+    },
+    {
+      "id": "feature_class://CityGIS.gdb\\LandUse\\Zoning",
+      "name": "Zoning",
+      "node_type": "feature_class",
+      "properties": {
+        "geometry_type": "Polygon",
+        "shape_field": "Shape",
+        "oid_field": "OBJECTID",
+        "feature_dataset": "LandUse",
+        "field_count": 5,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "is_oid": true},
+          {"name": "Shape", "field_type": "Geometry", "is_shape": true},
+          {"name": "ZoneCode", "field_type": "String", "length": 10},
+          {"name": "ZoneName", "field_type": "String", "length": 50},
+          {"name": "MaxHeight", "field_type": "Double"}
+        ]
+      }
+    },
+    {
+      "id": "feature_class://CityGIS.gdb\\Utilities\\WaterPipes",
+      "name": "WaterPipes",
+      "node_type": "feature_class",
+      "properties": {
+        "geometry_type": "Polyline",
+        "shape_field": "Shape",
+        "oid_field": "OBJECTID",
+        "feature_dataset": "Utilities",
+        "field_count": 10,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "is_oid": true},
+          {"name": "Shape", "field_type": "Geometry", "is_shape": true},
+          {"name": "PipeID", "field_type": "String", "length": 20},
+          {"name": "Diameter", "field_type": "Double"},
+          {"name": "Material", "field_type": "String", "length": 30},
+          {"name": "InstallDate", "field_type": "Date"},
+          {"name": "Depth", "field_type": "Double"},
+          {"name": "Pressure", "field_type": "Double"},
+          {"name": "Condition", "field_type": "SmallInteger"},
+          {"name": "LastInspection", "field_type": "Date"}
+        ]
+      }
+    },
+    {
+      "id": "feature_class://CityGIS.gdb\\Utilities\\PumpStations",
+      "name": "PumpStations",
+      "node_type": "feature_class",
+      "properties": {
+        "geometry_type": "Point",
+        "shape_field": "Shape",
+        "oid_field": "OBJECTID",
+        "feature_dataset": "Utilities",
+        "field_count": 7,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "is_oid": true},
+          {"name": "Shape", "field_type": "Geometry", "is_shape": true},
+          {"name": "StationName", "field_type": "String", "length": 100},
+          {"name": "Capacity", "field_type": "Double"},
+          {"name": "Status", "field_type": "SmallInteger"},
+          {"name": "InstallDate", "field_type": "Date"},
+          {"name": "LastMaintenance", "field_type": "Date"}
+        ]
+      }
+    },
+    {
+      "id": "table://CityGIS.gdb\\MaintenanceLog",
+      "name": "MaintenanceLog",
+      "node_type": "table",
+      "properties": {
+        "field_count": 6,
+        "fields": [
+          {"name": "OBJECTID", "field_type": "OID", "is_oid": true},
+          {"name": "AssetID", "field_type": "String", "length": 20},
+          {"name": "MaintenanceDate", "field_type": "Date"},
+          {"name": "Description", "field_type": "String", "length": 255},
+          {"name": "Cost", "field_type": "Double"},
+          {"name": "Technician", "field_type": "String", "length": 50}
+        ]
+      }
+    },
+    {
+      "id": "domain://RoadClassDomain",
+      "name": "RoadClassDomain",
+      "node_type": "domain",
+      "properties": {
+        "domain_type": "codedValue",
+        "description": "Classification of road types",
+        "field_type": "SmallInteger",
+        "coded_values": {
+          "1": "Highway",
+          "2": "Arterial",
+          "3": "Collector",
+          "4": "Local"
+        }
+      }
+    },
+    {
+      "id": "domain://SurfaceTypeDomain",
+      "name": "SurfaceTypeDomain",
+      "node_type": "domain",
+      "properties": {
+        "domain_type": "codedValue",
+        "description": "Road surface material types",
+        "field_type": "String",
+        "coded_values": {
+          "1": "Asphalt",
+          "2": "Concrete",
+          "3": "Gravel",
+          "4": "Dirt"
+        }
+      }
+    },
+    {
+      "id": "domain://LandUseDomain",
+      "name": "LandUseDomain",
+      "node_type": "domain",
+      "properties": {
+        "domain_type": "codedValue",
+        "description": "Land use classification codes",
+        "field_type": "SmallInteger",
+        "coded_values": {
+          "1": "Residential",
+          "2": "Commercial",
+          "3": "Industrial",
+          "4": "Agricultural",
+          "5": "Mixed Use"
+        }
+      }
+    },
+    {
+      "id": "topology://CityGIS.gdb\\LandUse\\LandUse_Topology",
+      "name": "LandUse_Topology",
+      "node_type": "topology",
+      "properties": {
+        "feature_dataset": "LandUse",
+        "tolerance": 0.001,
+        "rule_count": 2,
+        "rules": [
+          {"rule_type": "Must Not Overlap", "origin_feature_class": "Parcels", "destination_feature_class": ""},
+          {"rule_type": "Must Not Have Gaps", "origin_feature_class": "Zoning", "destination_feature_class": ""}
+        ]
+      }
+    },
+    {
+      "id": "relclass://CityGIS.gdb\\Infrastructure\\Roads_PumpStations_Rel",
+      "name": "Roads_PumpStations_Rel",
+      "node_type": "relationship_class",
+      "properties": {
+        "origin_classes": ["Roads"],
+        "destination_classes": ["PumpStations"],
+        "cardinality": "OneToMany",
+        "forward_label": "serves",
+        "backward_label": "served by",
+        "is_composite": false
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "feature_dataset://Infrastructure",
+      "target": "feature_class://CityGIS.gdb\\Infrastructure\\Roads",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_dataset://Infrastructure",
+      "target": "feature_class://CityGIS.gdb\\Infrastructure\\Bridges",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_dataset://LandUse",
+      "target": "feature_class://CityGIS.gdb\\LandUse\\Parcels",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_dataset://LandUse",
+      "target": "feature_class://CityGIS.gdb\\LandUse\\Zoning",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_dataset://Utilities",
+      "target": "feature_class://CityGIS.gdb\\Utilities\\WaterPipes",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_dataset://Utilities",
+      "target": "feature_class://CityGIS.gdb\\Utilities\\PumpStations",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_dataset://LandUse",
+      "target": "table://CityGIS.gdb\\MaintenanceLog",
+      "edge_type": "contains",
+      "label": "contains"
+    },
+    {
+      "source": "feature_class://CityGIS.gdb\\Infrastructure\\Roads",
+      "target": "domain://RoadClassDomain",
+      "edge_type": "uses_domain",
+      "label": "RoadClass → RoadClassDomain"
+    },
+    {
+      "source": "feature_class://CityGIS.gdb\\Infrastructure\\Roads",
+      "target": "domain://SurfaceTypeDomain",
+      "edge_type": "uses_domain",
+      "label": "Surface → SurfaceTypeDomain"
+    },
+    {
+      "source": "feature_class://CityGIS.gdb\\LandUse\\Parcels",
+      "target": "domain://LandUseDomain",
+      "edge_type": "uses_domain",
+      "label": "LandUse → LandUseDomain"
+    },
+    {
+      "source": "feature_dataset://LandUse",
+      "target": "topology://CityGIS.gdb\\LandUse\\LandUse_Topology",
+      "edge_type": "controller",
+      "label": "controls"
+    },
+    {
+      "source": "topology://CityGIS.gdb\\LandUse\\LandUse_Topology",
+      "target": "feature_class://CityGIS.gdb\\LandUse\\Parcels",
+      "edge_type": "topology_rule",
+      "label": "Must Not Overlap"
+    },
+    {
+      "source": "topology://CityGIS.gdb\\LandUse\\LandUse_Topology",
+      "target": "feature_class://CityGIS.gdb\\LandUse\\Zoning",
+      "edge_type": "topology_rule",
+      "label": "Must Not Have Gaps"
+    },
+    {
+      "source": "feature_class://CityGIS.gdb\\Infrastructure\\Roads",
+      "target": "feature_class://CityGIS.gdb\\Utilities\\PumpStations",
+      "edge_type": "relationship",
+      "label": "serves",
+      "properties": {
+        "relationship_class": "Roads_PumpStations_Rel",
+        "cardinality": "OneToMany"
+      }
+    }
+  ]
+}
