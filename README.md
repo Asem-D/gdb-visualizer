@@ -175,18 +175,18 @@ List available extraction backends and their status.
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Geodatabase │────▶│   Extractor  │────▶│    Graph     │
-│   (.gdb)     │     │  (arcpy/ogr) │     │   (Model)    │
-└─────────────┘     └──────────────┘     └──────┬──────┘
-                                                │
-                    ┌──────────────┐     ┌──────▼──────┐
-                    │  JSON file   │◀────│  Exporter    │
-                    │  .mmd file   │◀────│  (json/mmd/  │
-                    │  .puml file  │◀────│   puml/dot/  │
-                    │  .dot file   │◀────│   md)        │
-                    │  .md file    │◀────│              │
-                    └──────────────┘     └─────────────┘
+┌──────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Geodatabase │────▶   Extractor   │────▶     Graph   │
+│   (.gdb)     │     │  (arcpy/ogr) │     │   (Model)   │
+└──────────────┘     └──────────────┘     └──────┬──────┘
+                                                 │
+                    ┌──────────────┐     ┌───────▼───────┐
+                    │  JSON file   │◀────│  Exporter     │
+                    │  .mmd file   │◀────│  (json/mmd/   │
+                    │  .puml file  │◀────│   puml/dot/   │
+                    │  .dot file   │◀────│   md)         │
+                    │  .md file    │◀────│               │
+                    └──────────────┘     └───────────────┘
 ```
 
 **Key design decisions:**
